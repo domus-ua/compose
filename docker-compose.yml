@@ -12,8 +12,6 @@ services:
       MYSQL_ROOT_PASSWORD: root
     volumes:
       - db-data:/var/lib/mysql
-    networks:
-      - backend
       
   rest-api:
     image: registry.gitlab.com/tqs-domus/rest-api
@@ -26,15 +24,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/domus?useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: springboot
       SPRING_DATASOURCE_PASSWORD: domus_20
-    networks:
-      - all
 
 volumes:
   db-data:
-
-networks:
-  all:
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.1.0.0/16
