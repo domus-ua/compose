@@ -1,40 +1,67 @@
-version: "3.8"
+image: ubuntu
 
-services:
-  db:
-    image: mysql:8
-    ports:
-      - "3307:3306"
-    environment:
-      MYSQL_DATABASE: domus
-      MYSQL_USER: springboot
-      MYSQL_PASSWORD: domus_20
-      MYSQL_ROOT_PASSWORD: root
-    volumes:
-      - db-data:/var/lib/mysql
-    networks:
-      - backend
-      
-  rest-api:
-    image: registry.gitlab.com/tqs-domus/rest-api
-    ports:
-      - "8080:8080"
-    restart: always
-    depends_on:
-      - db
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/domus?useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: springboot
-      SPRING_DATASOURCE_PASSWORD: domus_20
-    networks:
-      - all
+stages:
+  - deploy
 
-volumes:
-  db-data:
+before_script:
+  ##
+  ## Install ssh-agent if not already installed, it is required by Docker.
+  ## (change apt-get to yum if you use an RPM-based image)
+  ##
+  - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client git -y )'
 
-networks:
-  all:
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.1.0.0/16
+  ##
+  ## Run ssh-agent (inside the build environment)
+  ##
+  - eval $(ssh-agent -s)
+
+  ##
+  ## Add the SSH key stored in SSH_PRIVATE_KEY variable to the agent store
+  ## We're using tr to fix line endings which makes ed25519 keys work
+  ## without extra base64 encoding.
+  ## https://gitlab.com/gitlab-examples/ssh-private-key/issues/1#note_48526556
+  ##
+  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+
+  ##
+  ## Create the SSH directory and give it the right permissions
+  ##
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+
+  ##
+  ## Use ssh-keyscan to scan the keys of your private server. Replace gitlab.com
+  ## with your own domain name. You can copy and repeat that command if you have
+  ## more than one server to connect to.
+  ##
+  - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+  - chmod 644 ~/.ssh/known_hosts
+
+  ##
+  ## Alternatively, assuming you created the SSH_SERVER_HOSTKEYS variable
+  ## previously, uncomment the following two lines instead.
+  ##
+  #- echo "$SSH_SERVER_HOSTKEYS" > ~/.ssh/known_hosts'
+  #- chmod 644 ~/.ssh/known_hosts
+
+  ##
+  ## You can optionally disable host key checking. Be aware that by adding that
+  ## you are suspectible to man-in-the-middle attacks.
+  ## WARNING: Use this only with the Docker executor, if you use it with shell
+  ## you will overwrite your user's SSH config.
+  ##
+  - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+
+deploy_staging:
+  type: deploy
+  stage: deploy
+  script:
+    - echo 'Deploying...'
+    # only needed the 1st time. after that crashes the pipeline.
+    # - ssh mylife@$HOST "mkdir /home/mylife/compose/ && exit"
+    - scp docker-compose.yml mylife@$HOST:/home/tqs/compose/
+    # docker login sometimes fails. Run: sudo apt install gnupg2 pass. only necessary 1st time.
+    - ssh mylife@$HOST "docker login registry.gitlab.com -u $GITLAB_USER_NAME -p $GITLAB_USER_PASSWORD && exit"
+    - ssh mylife@$HOST "cd /home/tqs/compose/ && docker-compose pull && docker-compose up -d && exit"
+  only:
+    - master
