@@ -26,6 +26,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: domus_20
   
   web-app:
+    stdin_open: true
     image: registry.gitlab.com/tqs-domus/web-application
     ports:
       - "3000:3000"
