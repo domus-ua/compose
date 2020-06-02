@@ -58,7 +58,7 @@ deploy_staging:
   script:
     - echo 'Deploying...'
     # only needed the 1st time. after that crashes the pipeline.
-    # - ssh mylife@$HOST "mkdir /home/mylife/compose/ && exit"
+    # - ssh tqs@$HOST "mkdir /home/tqs/compose/ && exit"
     - scp docker-compose.yml tqs@$HOST:/home/tqs/compose/
     # docker login sometimes fails. Run: sudo apt install gnupg2 pass. only necessary 1st time.
     - ssh tqs@$HOST "docker login registry.gitlab.com -u $GITLAB_USER_NAME -p $GITLAB_USER_PASSWORD && exit"
